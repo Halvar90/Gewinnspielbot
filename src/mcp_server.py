@@ -107,6 +107,24 @@ def fund_status(fund_id: int, status: str, notiz: str = "",
 
 
 @mcp.tool()
+def fund_status_mehrere(fund_ids: str, status: str, notiz: str = "") -> str:
+    """Mehrere Funde auf einmal auf denselben Status setzen.
+    fund_ids = kommagetrennte ids, z.B. "3,4,7,12"."""
+    if status not in STATUS:
+        return f"Fehler: status muss aus {STATUS} sein"
+    try:
+        ids = [int(x) for x in fund_ids.replace(" ", "").split(",") if x]
+    except ValueError:
+        return "Fehler: fund_ids muss wie '3,4,7' aussehen"
+    if not ids:
+        return "Fehler: keine ids angegeben"
+    rows = db.q("""UPDATE fund SET status=%s,
+                   notiz=COALESCE(NULLIF(%s,''),notiz), geaendert=now()
+                   WHERE id = ANY(%s) RETURNING id,status""", (status, notiz, ids))
+    return _j({"geaendert": len(rows), "status": status, "ids": [r["id"] for r in rows]})
+
+
+@mcp.tool()
 def frist_anlegen(titel: str, faellig_am: str, url: str = "",
                   taeglich: bool = False, notiz: str = "") -> str:
     """Frist eintragen. faellig_am als JJJJ-MM-TT. taeglich=True fuer

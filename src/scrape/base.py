@@ -108,7 +108,9 @@ GESCHLOSSEN = re.compile(
     r"|aktion (?:ist )?(?:beendet|abgelaufen)"
     r"|das sind die tester|die tester stehen"
     r"|gewinner stehen fest|teilnahmeschluss war"
-    r"|bewerbungsschluss war|leider (?:schon )?vorbei", re.I)
+    r"|bewerbungsschluss war|leider (?:schon )?vorbei"
+    r"|bewerbungsfrist[^.]{0,60}abgelaufen"   # techrush-Wortlaut
+    r"|aktion beendet", re.I)
 
 FRIST_DETAIL = re.compile(
     r"(?:einsendeschluss|teilnahmeschluss|bewerbungsschluss|bewerbungsfrist"
