@@ -2,7 +2,11 @@
 
 Aufruf:  python -m src.run_check          (alle aktiven Quellen)
          python -m src.run_check techrush (nur eine)
+
+Beim ersten Lauf des Tages (vor 8 Uhr UTC) geht zusaetzlich die
+Fristen-Erinnerung raus - so braucht es keinen zweiten Cron-Dienst.
 """
+import datetime as dt
 import sys
 import time
 import traceback
@@ -84,5 +88,9 @@ def melde(neu: list[dict]) -> int:
 
 
 if __name__ == "__main__":
-    r = lauf(sys.argv[1] if len(sys.argv) > 1 else None)
-    print(r)
+    nur = sys.argv[1] if len(sys.argv) > 1 else None
+    r = lauf(nur)
+    print(r, flush=True)
+    if not nur and dt.datetime.now(dt.timezone.utc).hour < 8:
+        from .fristen import erinnere
+        print("Fristen:", erinnere()[:300], flush=True)
