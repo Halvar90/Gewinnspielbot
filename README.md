@@ -38,7 +38,8 @@ keinen Commit, nur einen `quelle_anlegen`-Aufruf.
    `https://<domain>/mcp/<MCP_SECRET>`.
 5. **Settings → Serverless (App Sleeping)** einschalten: der MCP-Server
    schlaeft, bis Claude ihn anspricht. Spart den Grossteil der Kosten.
-6. Zwei **Cron-Services** im gleichen Projekt, gleiches Repo:
+6. Zwei **Cron-Services** im gleichen Projekt, gleiches Repo. Start Command
+   im Service setzen (railway.json setzt absichtlich keinen):
    - `python -m src.run_check`, Schedule `0 6,10,18 * * *`
    - `python -m src.fristen`, Schedule `30 7 * * *`
    Beide brauchen dieselben Variablen (Railway: Variable References).
