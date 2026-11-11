@@ -14,11 +14,22 @@ AUSSCHLUSS = [
     (r"nassfutter|katzenfutter nass|dosenfutter|frischbeutel|schale.*katze",
      "Katzen nur Trockenfutter"),
     (r"dinner for cats|dinner for dogs", "Telefon-Verkaufsanruf"),
-    (r"kassenbon|cashback|geld.?zurueck|geld.?zuruck|kauf nachweis|"
+    (r"kas+enbon|cashback|geld.?zurueck|geld.?zuruck|kauf nachweis|"
      r"code eingeben|aktionscode vom produkt",
      "Kauf noetig - macht Uwe selbst"),
     (r"crabstone|burda direct", "Lead-Gewinnspiel mit Sponsorenliste"),
     (r"\btelegram\b.*tester|amazon.?tester", "keine Telegram-Testergruppen"),
+    # aus dem ersten Volllauf am 11.11.2026
+    (r"^zur[uue]ck zu|^zurück zu|^weiter zu|^alle \w+ anzeigen",
+     "Navigationslink, kein Angebot"),
+    (r"inkontinenz|\btena\b|drynites|bettn[aae]ss|bettnässer|windel",
+     "nicht passend"),
+    (r"kondom|billy boy|gleitgel", "nicht passend"),
+    (r"\balways\b|slipeinlage|damenbinde", "Damenhygiene"),
+    (r"nahrungserg[aae]nzung|nahrungsergänzung|\bkapseln\b|vitamin|"
+     r"orthomol|heilerde|kollagen|probiotik",
+     "Nahrungsergaenzung/Gesundheit"),
+    (r"brille|kontaktlinse", "nicht passend"),
 ]
 
 # Interessen: Treffer wird hochpriorisiert

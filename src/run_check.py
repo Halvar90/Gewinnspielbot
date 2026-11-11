@@ -90,18 +90,29 @@ def lauf(nur: str | None = None) -> dict:
 
 
 def melde(neu: list[dict]) -> int:
+    """Push nur fuer echte Treffer. Alles mit "unklar" bleibt auf Status
+    'neu' liegen und wird von Claude ueber MCP durchgesehen - sonst
+    erschlaegt der aufgestaute Bestand jeden Lauf per Telegram."""
     if not neu:
         return 0
-    neu.sort(key=lambda f: (f.get("prio") or 5, f["quelle"]))
-    txt = (f"<b>{len(neu)} neue Funde</b>\n\n"
-           + "\n\n".join(notify.zeile(f) for f in neu[:25]))
-    if len(neu) > 25:
-        txt += f"\n\n… und {len(neu) - 25} weitere, siehe Dashboard."
+    treffer = [f for f in neu if (f.get("vorfilter") or "").startswith("passt")]
+    rest = len(neu) - len(treffer)
+    if not treffer:
+        if rest:
+            print(f"[melde] {rest} unklare Funde liegen zur Triage", flush=True)
+        return 0
+    treffer.sort(key=lambda f: (f.get("prio") or 5, f["quelle"]))
+    txt = (f"<b>{len(treffer)} neue Treffer</b>\n\n"
+           + "\n\n".join(notify.zeile(f) for f in treffer[:20]))
+    if len(treffer) > 20:
+        txt += f"\n\n... und {len(treffer) - 20} weitere."
+    if rest:
+        txt += f"\n\nDazu {rest} unklare Funde - Claude sieht sie durch."
     if notify.telegram(txt):
-        ids = [f["id"] for f in neu]
         db.q("""UPDATE fund SET status='gemeldet', geaendert=now()
-                WHERE id = ANY(%s) AND status='neu'""", (ids,))
-        return len(neu)
+                WHERE id = ANY(%s) AND status='neu'""",
+             ([f["id"] for f in treffer],))
+        return len(treffer)
     return 0
 
 

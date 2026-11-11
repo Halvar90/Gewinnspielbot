@@ -35,9 +35,8 @@ def pruefe(fund, quelle: dict, rg: dict) -> Urteil:
     titel = fund.titel
     # 1. Ist es ueberhaupt ein Angebot? Nur pruefen, wenn die Quelle
     #    gemischte Inhalte hat (also Stichwoerter definiert sind).
-    if quelle.get("keywords"):
-        if not any(p.search(titel) for p in _RELEVANT):
-            return Urteil(False, "kein Angebots-Stichwort im Titel")
+    if not any(p.search(titel) for p in _RELEVANT):
+        return Urteil(False, "kein Angebots-Stichwort im Titel")
     # 2. Harte Ausschluesse
     for pat, grund in rg.get("ausschluss", []):
         if pat.search(titel):
