@@ -13,7 +13,7 @@ import traceback
 
 from . import db, notify
 from .filter import pruefe, regeln
-from .scrape.base import sammle
+from .scrape.base import detail, sammle
 
 
 def lauf(nur: str | None = None) -> dict:
@@ -24,14 +24,32 @@ def lauf(nur: str | None = None) -> dict:
     quellen = db.q(f"SELECT * FROM quelle WHERE aktiv {wo} ORDER BY prio",
                    (nur,) if nur else None)
     neu, gesehen, fehler, details = [], 0, 0, []
+    detail_budget = 15  # Requests fuer Detailseiten pro Lauf
 
     for qu in quellen:
         try:
             funde = sammle(qu)
             gesehen += len(funde)
             durch = 0
+            # Schon bekannte Funde gar nicht weiter anfassen
+            bekannt = {r["url_hash"] for r in db.q(
+                "SELECT url_hash FROM fund WHERE url_hash = ANY(%s)",
+                ([f.url_hash for f in funde] or [""],))}
             for f in funde:
+                if f.url_hash in bekannt:
+                    continue
                 u = pruefe(f, qu, rg)
+                # Bei wichtigen Quellen die Detailseite nachladen: dort
+                # stehen Frist und ob die Runde noch laeuft.
+                if u.durch and detail_budget > 0 and (qu.get("prio") or 5) <= 3:
+                    detail_budget -= 1
+                    frist, zu = detail(f.url)
+                    if frist:
+                        f.frist = frist
+                    if zu:
+                        u = u.__class__(False, f"Runde beendet ({zu})", u.prio)
+                    elif frist and frist < dt.date.today().isoformat():
+                        u = u.__class__(False, f"Frist abgelaufen ({frist})", u.prio)
                 row = db.q1("""
                     INSERT INTO fund (url_hash,url,titel,quelle,kategorie,
                                       frist,status,vorfilter)

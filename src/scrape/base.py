@@ -67,7 +67,8 @@ def sammle(quelle: dict, html: str | None = None) -> list[Fund]:
     tree = HTMLParser(html)
     pat = re.compile(quelle["link_pattern"], re.I) if quelle.get("link_pattern") else None
     kws = [re.compile(k, re.I) for k in (quelle.get("keywords") or [])]
-    gesehen, out = set(), []
+    selbst = Fund(titel="x", url=quelle["url"], quelle="x").url_hash
+    gesehen, out = {selbst}, []
 
     for a in tree.css("a"):
         href = (a.attributes.get("href") or "").strip()
@@ -99,3 +100,43 @@ def sammle(quelle: dict, html: str | None = None) -> list[Fund]:
         f.frist = frist_aus_text(ctx) or frist_aus_text(titel)
         out.append(f)
     return out[:60]
+
+
+GESCHLOSSEN = re.compile(
+    r"bewerbungsphase (?:ist )?(?:beendet|abgeschlossen|vorbei)"
+    r"|bewerbung(?:en)? (?:ist|sind) (?:nicht mehr|leider nicht)"
+    r"|aktion (?:ist )?(?:beendet|abgelaufen)"
+    r"|das sind die tester|die tester stehen"
+    r"|gewinner stehen fest|teilnahmeschluss war"
+    r"|bewerbungsschluss war|leider (?:schon )?vorbei", re.I)
+
+FRIST_DETAIL = re.compile(
+    r"(?:einsendeschluss|teilnahmeschluss|bewerbungsschluss|bewerbungsfrist"
+    r"|bewerben bis|bewerbung bis|l[äa]uft bis|endet am|bis zum)"
+    r"[:\s]*(\d{1,2})\.(\d{1,2})\.(\d{2,4})", re.I)
+
+
+def detail(url: str) -> tuple[str | None, str | None]:
+    """Detailseite lesen. Liefert (frist, geschlossen_grund).
+
+    Nur fuer neue Kandidaten aufrufen - kostet einen Request pro Fund.
+    """
+    try:
+        html = hole(url)
+    except Exception as e:
+        return None, None  # Netzfehler ist kein Ausschluss
+    time.sleep(config.HOEFLICH_S)
+    text = " ".join(HTMLParser(html).text().split())[:20000]
+    zu = GESCHLOSSEN.search(text)
+    m = FRIST_DETAIL.search(text)
+    frist = None
+    if m:
+        t, mo, j = m.groups()
+        j = int(j)
+        if j < 100:
+            j += 2000
+        try:
+            frist = f"{j:04d}-{int(mo):02d}-{int(t):02d}"
+        except ValueError:
+            frist = None
+    return frist, (zu.group(0)[:60] if zu else None)
