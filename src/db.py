@@ -55,9 +55,9 @@ SEED_QUELLEN = [
          kategorie="werkzeug", link_pattern=r"gotools\.de/",
          keywords=["gewinn", "verlosung"], prio=4),
     dict(name="mydealz-freebies",
-         url="https://www.mydealz.de/gruppe/freebies",
-         kategorie="allgemein", link_pattern=r"mydealz\.de/(deals|gutscheine)/",
-         keywords=[], prio=2),
+         url="https://www.mydealz.de/rss/gruppe/freebies",
+         kategorie="allgemein", link_pattern=None,
+         keywords=[], prio=2, methode="rss"),
     dict(name="kostenlos-uebersicht",
          url="https://www.kostenlos.de/gratisartikel-uebersicht",
          kategorie="allgemein", link_pattern=r"kostenlos\.de/",
@@ -82,10 +82,11 @@ def init():
     with cur() as c:
         c.execute(sql)
         for r in SEED_QUELLEN:
+            r = {"methode": "static", **r}
             c.execute("""INSERT INTO quelle
-                (name,url,kategorie,link_pattern,keywords,prio)
+                (name,url,kategorie,link_pattern,keywords,prio,methode)
                 VALUES (%(name)s,%(url)s,%(kategorie)s,%(link_pattern)s,
-                        %(keywords)s,%(prio)s)
+                        %(keywords)s,%(prio)s,%(methode)s)
                 ON CONFLICT (name) DO NOTHING""", r)
         for art, muster, grund in seed_regeln():
             c.execute("""INSERT INTO regel (art,muster,grund)

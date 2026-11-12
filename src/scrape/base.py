@@ -7,6 +7,7 @@ lassen den Vorfilter entscheiden. Das bricht seltener als Selektoren.
 import datetime as dt
 import hashlib
 import re
+import xml.etree.ElementTree as ET
 import time
 from dataclasses import dataclass, field
 from urllib.parse import urljoin, urlparse, urlunparse
@@ -88,10 +89,37 @@ def frist_aus_text(text: str) -> str | None:
         return None
 
 
+def aus_rss(quelle: dict, xml_text: str) -> list[Fund]:
+    """RSS/Atom lesen. Fuer Seiten, die Scraping abwehren (mydealz:
+    Cloudflare-Zwischenseite lieferte still null Treffer)."""
+    out, gesehen = [], set()
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError as e:
+        raise RuntimeError(f"RSS nicht lesbar: {e}")
+    knoten = root.iter("item")
+    for it in knoten:
+        titel = (it.findtext("title") or "").strip()
+        url = (it.findtext("link") or "").strip()
+        if not titel or not url or len(titel) < 12:
+            continue
+        f = Fund(titel=" ".join(titel.split())[:200], url=url,
+                 quelle=quelle["name"],
+                 kategorie=quelle.get("kategorie") or "allgemein")
+        if f.url_hash in gesehen:
+            continue
+        gesehen.add(f.url_hash)
+        f.frist = frist_aus_text(it.findtext("description") or "")
+        out.append(f)
+    return out[:60]
+
+
 def sammle(quelle: dict, html: str | None = None) -> list[Fund]:
     """Liest eine Quelle und liefert Kandidaten. Wirft bei Netzfehlern."""
     html = html if html is not None else hole(quelle["url"])
     time.sleep(config.HOEFLICH_S)
+    if (quelle.get("methode") or "static") == "rss":
+        return aus_rss(quelle, html)
     tree = HTMLParser(html)
     pat = re.compile(quelle["link_pattern"], re.I) if quelle.get("link_pattern") else None
     kws = [re.compile(k, re.I) for k in (quelle.get("keywords") or [])]
@@ -142,6 +170,14 @@ GESCHLOSSEN = re.compile(
     r"|bewerbungsfrist[^.]{0,60}abgelaufen"   # techrush-Wortlaut
     r"|aktion beendet", re.I)
 
+# Erkennt auf der Detailseite, dass ein Kauf noetig ist. Gelernt an
+# BiFi: kostenlos.de titelt "gratis testen", die Aktionsseite ist eine
+# Cashback-Aktion mit Kassenbon und IBAN.
+KAUF = re.compile(
+    r"cashback|kaufpreis (?:wird )?(?:zur[uü]ck )?erstatt|kaufbeleg|"
+    r"kassenbon|geld.?zur[uü]ck|erstattung|iban|"
+    r"produkt kaufen und", re.I)
+
 FRIST_DETAIL = re.compile(
     r"(?:einsendeschluss|teilnahmeschluss|bewerbungsschluss|bewerbungsfrist"
     r"|bewerben bis|bewerbung bis|l[äa]uft bis|endet am|bis zum)"
@@ -159,7 +195,7 @@ def detail(url: str) -> tuple[str | None, str | None]:
         return None, None  # Netzfehler ist kein Ausschluss
     time.sleep(config.HOEFLICH_S)
     text = " ".join(HTMLParser(html).text().split())[:20000]
-    zu = GESCHLOSSEN.search(text)
+    zu = GESCHLOSSEN.search(text) or KAUF.search(text)
     m = FRIST_DETAIL.search(text)
     frist = None
     if m:

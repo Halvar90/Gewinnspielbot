@@ -152,21 +152,27 @@ def frist_erledigt(frist_id: int, datum: str = "") -> str:
 @mcp.tool()
 def quelle_anlegen(name: str, url: str, kategorie: str = "allgemein",
                    link_pattern: str = "", keywords: str = "",
-                   prio: int = 5) -> str:
+                   prio: int = 5, methode: str = "static") -> str:
     """Neue Quelle eintragen; wird ab dem naechsten Lauf mitgeprueft.
     link_pattern = Regex auf die Ziel-URL (z.B. '/gewinnspiel/\\d+').
     keywords = kommagetrennte Stichwoerter, die im Linktext stehen muessen
     (leer lassen, wenn die Seite ohnehin nur Angebote listet).
-    prio 1 = eilig (taegliche Deadline), 5 = normal."""
+    prio 1 = eilig (taegliche Deadline), 5 = normal.
+    methode: "static" fuer HTML, "rss" fuer einen Feed (robuster, wenn die
+    Seite Scraping abwehrt)."""
     kw = [k.strip() for k in keywords.split(",") if k.strip()]
-    r = db.q1("""INSERT INTO quelle (name,url,kategorie,link_pattern,keywords,prio)
-                 VALUES (%s,%s,%s,NULLIF(%s,''),%s,%s)
+    if methode not in ("static", "rss"):
+        return "Fehler: methode muss static oder rss sein"
+    r = db.q1("""INSERT INTO quelle
+                 (name,url,kategorie,link_pattern,keywords,prio,methode)
+                 VALUES (%s,%s,%s,NULLIF(%s,''),%s,%s,%s)
                  ON CONFLICT (name) DO UPDATE SET url=EXCLUDED.url,
                    kategorie=EXCLUDED.kategorie,
                    link_pattern=EXCLUDED.link_pattern,
-                   keywords=EXCLUDED.keywords, prio=EXCLUDED.prio, aktiv=TRUE
-                 RETURNING id,name,url,prio""",
-              (name, url, kategorie, link_pattern, kw, prio))
+                   keywords=EXCLUDED.keywords, prio=EXCLUDED.prio,
+                   methode=EXCLUDED.methode, aktiv=TRUE
+                 RETURNING id,name,url,prio,methode""",
+              (name, url, kategorie, link_pattern, kw, prio, methode))
     return _j(r)
 
 
