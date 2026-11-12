@@ -118,7 +118,13 @@ def sammle(quelle: dict, html: str | None = None) -> list[Fund]:
     """Liest eine Quelle und liefert Kandidaten. Wirft bei Netzfehlern."""
     html = html if html is not None else hole(quelle["url"])
     time.sleep(config.HOEFLICH_S)
-    if (quelle.get("methode") or "static") == "rss":
+    # Feed erkennen: entweder so konfiguriert oder am Inhalt sichtbar.
+    # So genuegt es, die URL auf den Feed zu zeigen.
+    kopf = html[:300].lstrip()
+    if ((quelle.get("methode") or "static") == "rss"
+            or kopf.startswith("<?xml")
+            or "<rss" in kopf.lower()
+            or "<feed" in kopf.lower()):
         return aus_rss(quelle, html)
     tree = HTMLParser(html)
     pat = re.compile(quelle["link_pattern"], re.I) if quelle.get("link_pattern") else None
