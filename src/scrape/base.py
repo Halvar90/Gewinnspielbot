@@ -4,6 +4,7 @@ Begruendung: Portalseiten aendern ihr Markup oft, aber nicht ihre Link-
 Struktur. Wir holen alle <a>, filtern per URL-Regex und Linktext und
 lassen den Vorfilter entscheiden. Das bricht seltener als Selektoren.
 """
+import datetime as dt
 import hashlib
 import re
 import time
@@ -14,6 +15,13 @@ import httpx
 from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from .. import config
+
+# Button- und CTA-Texte: taugen nicht als Titel eines Fundes
+GENERISCH = re.compile(
+    r"^(?:testergebnis(?:se)?|mehr erfahren|mehr infos?|zu den details|"
+    r"details|jetzt bewerben|jetzt mitmachen|jetzt testen|hier klicken|"
+    r"weiterlesen|zur aktion|teilnehmen|anmelden|mehr dazu|"
+    r"alle (?:\w+ )?anzeigen|zum produkt|zum angebot)[\s!.:]*$", re.I)
 
 DATUM = re.compile(
     r"(?:einsendeschluss|teilnahmeschluss|bis(?:\s+zum)?|endet(?:\s+am)?)"
@@ -46,6 +54,26 @@ def hole(url: str) -> str:
         return r.text
 
 
+def plausibel(frist: str | None) -> str | None:
+    """Verwirft Datumsangaben, die keine Frist sein koennen.
+
+    Der generische Scraper fischt sonst Jahreszahlen aus Testberichten
+    (gesehen: 0202-04-24, 2019, 2021) und meldet sie als Frist.
+    """
+    if not frist:
+        return None
+    try:
+        d = dt.date.fromisoformat(frist)
+    except ValueError:
+        return None
+    heute = dt.date.today()
+    if d < heute - dt.timedelta(days=7):
+        return None            # zu alt, kann keine offene Frist sein
+    if d > heute + dt.timedelta(days=730):
+        return None            # mehr als zwei Jahre voraus: unglaubwuerdig
+    return frist
+
+
 def frist_aus_text(text: str) -> str | None:
     m = DATUM.search(text or "")
     if not m:
@@ -55,7 +83,7 @@ def frist_aus_text(text: str) -> str | None:
     if j < 100:
         j += 2000
     try:
-        return f"{j:04d}-{int(mo):02d}-{int(t):02d}"
+        return plausibel(f"{j:04d}-{int(mo):02d}-{int(t):02d}")
     except ValueError:
         return None
 
@@ -77,6 +105,8 @@ def sammle(quelle: dict, html: str | None = None) -> list[Fund]:
         url = urljoin(quelle["url"], href)
         titel = " ".join((a.text() or "").split())
         if len(titel) < 12 or len(titel) > 220:
+            continue
+        if GENERISCH.match(titel):
             continue
         if pat and not pat.search(url):
             continue
@@ -138,7 +168,7 @@ def detail(url: str) -> tuple[str | None, str | None]:
         if j < 100:
             j += 2000
         try:
-            frist = f"{j:04d}-{int(mo):02d}-{int(t):02d}"
+            frist = plausibel(f"{j:04d}-{int(mo):02d}-{int(t):02d}")
         except ValueError:
             frist = None
     return frist, (zu.group(0)[:60] if zu else None)

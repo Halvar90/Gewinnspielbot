@@ -62,8 +62,17 @@ def lauf(nur: str | None = None) -> dict:
                     row["prio"] = u.prio
                     neu.append(row)
                     durch += 1
-            db.q("""UPDATE quelle SET letzter_lauf=now(), letzter_fehler=NULL,
-                    fehler_serie=0 WHERE name=%s""", (qu["name"],))
+            # Null Treffer ist kein Absturz, aber oft trotzdem ein Defekt
+            # (Seite umgebaut, Cloudflare, JavaScript). Mitzaehlen.
+            if funde:
+                db.q("""UPDATE quelle SET letzter_lauf=now(),
+                        letzter_fehler=NULL, fehler_serie=0
+                        WHERE name=%s""", (qu["name"],))
+            else:
+                db.q("""UPDATE quelle SET letzter_lauf=now(),
+                        letzter_fehler='0 Treffer - Seite pruefen',
+                        fehler_serie=fehler_serie+1 WHERE name=%s""",
+                     (qu["name"],))
             details.append(f"{qu['name']}: {len(funde)} gesehen, {durch} neu")
         except Exception as e:
             fehler += 1
